@@ -13,7 +13,7 @@ NewPPM::NewPPM(Dasher::CSettingsStore* pSettingsStore, int iNumSyms) :
     maximumAmountOfNodes--;
 
     knownNodes.push_back(NewPPMNode({-1})); // Root Node
-    knownNodes.reserve(1672385);
+    knownNodes.reserve(1672383);
 }
 
 NewPPM::~NewPPM(){}
@@ -85,14 +85,28 @@ NewPPMNode_Ptr NewPPM::AddSymbolToNode(NewPPMNode_Ptr Node, Dasher::symbol Symbo
     const NewPPMNode_Ptr newNode = knownNodes.size() - 1;
     knownNodes[newNode].sym = Symbol;
 
-    auto& childArray = knownNodes[Node].children;
-    // check for capacity before creating new new element
-    if(childArray.get() == nullptr) childArray = std::make_unique<std::vector<NewPPMNode_Ptr>>();
-    if(childArray->size() == childArray->capacity()) childArray->reserve(std::min(static_cast<int>(childArray->capacity()*1.5f+1), m_iNumSyms));
-    childArray->emplace_back(newNode);
+    auto currentChild = knownNodes[Node].first_child;
+    if(currentChild >= 0){
+        // find last child in list
+        while(knownNodes[currentChild].next_sibling >= 0){
+            currentChild = knownNodes[currentChild].next_sibling;
+        }
+        knownNodes[currentChild].next_sibling = newNode;
+    }else{
+        knownNodes[Node].first_child = newNode;
+    }
+
     knownNodes[newNode].vine = (Node == 0) ? 0 : AddSymbolToNode(knownNodes[Node].vine, Symbol);
 
     return newNode;
+}
+
+inline const NewPPMNode_Ptr NewPPM::FindChild(const NewPPMNode_Ptr& Node, const Dasher::symbol& Symbol) {
+    if (knownNodes[Node].first_child < 0) return -1;
+    for (NewPPMNode_Ptr ref = knownNodes[Node].first_child; ref >= 0; ref = knownNodes[ref].next_sibling) {
+        if (knownNodes[ref].sym == Symbol) return ref;
+    }
+    return -1;
 }
 
 void NewPPM::LearnSymbol(Context Context, int Symbol){
@@ -129,9 +143,9 @@ void NewPPM::GetProbs(Context Context, std::vector<unsigned int>& Probs, int iNo
         int Total = 0;
         
         // sum all child counts
-        if(!knownNodes[curr].children) continue; // no children
+        if(knownNodes[curr].first_child < 0) continue; // no children
 
-        for(auto const& ref: *knownNodes[curr].children){
+        for(NewPPMNode_Ptr ref = knownNodes[curr].first_child; ref >= 0; ref = knownNodes[ref].next_sibling){
             Total += knownNodes[ref].count;
         }
 
@@ -139,7 +153,7 @@ void NewPPM::GetProbs(Context Context, std::vector<unsigned int>& Probs, int iNo
 
         const unsigned int size_of_slice = ToSpend;
 
-        for(auto const& ref: *knownNodes[curr].children){
+        for(NewPPMNode_Ptr ref = knownNodes[curr].first_child; ref >= 0; ref = knownNodes[ref].next_sibling){
             // optimized for decreased rounding error?
             const unsigned int p = static_cast<long long>(size_of_slice) * (100 * knownNodes[ref].count - beta) / (100 * Total + alpha);
             Probs[knownNodes[ref].sym] += p;

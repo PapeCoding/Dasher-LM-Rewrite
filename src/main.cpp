@@ -7,6 +7,7 @@
 #include <memory>
 #include <iostream>
 #include <ostream>
+#include <chrono>
 
 #define numSymbols 58
 #define norm INT_MAX
@@ -14,7 +15,7 @@
 #define symbolsTest  500000
 #define testSpeed false
 #define testSpeedClass NewPPM
-//#define testSpeedClass Dasher::CPPMLanguageModel
+#define testSpeedClass Dasher::CPPMLanguageModel
 
 std::unique_ptr<Dasher::XmlSettingsStore> Settings;
 
@@ -127,17 +128,22 @@ int testSpeedFunction(){
     std::ifstream trainFile("../trainText.txt");
     if (!trainFile.is_open()) return 1;
 
+    // read buffer into memory before timing
+    char* heapBuffer = new char[symbolsTrain];
+    trainFile.read(heapBuffer, symbolsTrain);
+
+    std::chrono::time_point start = std::chrono::high_resolution_clock::now();
+
     // some vars for training and testing
-    char c;
     long i = 0;
     Dasher::CLanguageModel::Context context;
     std::vector<unsigned int> probs;
 
     // train language model
     context = lm->CreateEmptyContext();
-    while(trainFile >> c && i < symbolsTrain){
+    while(i < symbolsTrain){
         //learn symbols
-        lm->LearnSymbol(context, translateChar(c));
+        lm->LearnSymbol(context, translateChar(heapBuffer[i]));
         lm->GetProbs(context, probs, norm, 0);
         i++;
     }
@@ -150,13 +156,16 @@ int testSpeedFunction(){
     // test language model
     i = 0;
     context = lm->CreateEmptyContext();
-    while(testFile >> c && i < symbolsTest){
-        lm->EnterSymbol(context, translateChar(c));
+    while(i < symbolsTest){
+        lm->EnterSymbol(context, translateChar(heapBuffer[i]));
         lm->GetProbs(context, probs, norm, 0);
         i++;
     }
     lm->ReleaseContext(context);
 
+    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count() << std::endl;
+
+    delete[] heapBuffer;
     return 0;
 }
 

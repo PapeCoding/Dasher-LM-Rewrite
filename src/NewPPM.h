@@ -10,7 +10,8 @@ struct NewPPMNode {
     Dasher::symbol sym;
     unsigned count = 1;
     NewPPMNode_Ptr vine = -1; // reference up the tree, where the referenced node is basically the same prefix but without the last character
-    std::unique_ptr<std::vector<NewPPMNode_Ptr>> children;
+    NewPPMNode_Ptr first_child = -1;
+    NewPPMNode_Ptr next_sibling = -1;
 };
 
 struct NewPPMContext {
@@ -34,16 +35,10 @@ class NewPPM : public Dasher::CLanguageModel
         virtual void GetProbs(Context Context, std::vector<unsigned int>& Probs, int iNorm, int iUniform) const;
 
     private:
-        inline bool isValidContext(Context Context) const;
+        bool isValidContext(Context Context) const;
         NewPPMNode_Ptr AddSymbolToNode(NewPPMNode_Ptr Node, Dasher::symbol Symbol);
 
-        const NewPPMNode_Ptr FindChild(const NewPPMNode_Ptr& Node, const Dasher::symbol& Symbol){
-            if(!knownNodes[Node].children) return -1;
-            for(const auto& ref : *knownNodes[Node].children){
-                if(knownNodes[ref].sym == Symbol) return ref;
-            }
-            return -1;
-        }
+        const NewPPMNode_Ptr FindChild(const NewPPMNode_Ptr& Node, const Dasher::symbol& Symbol);
 
         std::vector<NewPPMNode> knownNodes; //[0] is root node
         std::vector<NewPPMContext> knownContexts;
