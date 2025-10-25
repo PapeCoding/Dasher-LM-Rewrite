@@ -4,19 +4,17 @@
 #include <unordered_map>
 #include <memory>
 
-typedef long long NewPPMNode_Ptr; //references into our vector of known nodes
-
 struct NewPPMNode {
     Dasher::symbol sym;
     unsigned count = 1;
-    NewPPMNode_Ptr vine = -1; // reference up the tree, where the referenced node is basically the same prefix but without the last character
-    NewPPMNode_Ptr first_child = -1;
-    NewPPMNode_Ptr next_sibling = -1;
+    NewPPMNode* vine = nullptr; // reference up the tree, where the referenced node is basically the same prefix but without the last character
+    NewPPMNode* first_child = nullptr;
+    NewPPMNode* next_sibling = nullptr;
 };
 
 struct NewPPMContext {
     unsigned order = 0;
-    NewPPMNode_Ptr referencedNode = -1;
+    NewPPMNode* referencedNode = nullptr;
 };
 
 class NewPPM : public Dasher::CLanguageModel
@@ -36,9 +34,9 @@ class NewPPM : public Dasher::CLanguageModel
 
     private:
         bool isValidContext(Context Context) const;
-        NewPPMNode_Ptr AddSymbolToNode(NewPPMNode_Ptr Node, Dasher::symbol Symbol);
+        NewPPMNode* AddSymbolToNode(NewPPMNode* Node, Dasher::symbol Symbol);
 
-        const NewPPMNode_Ptr FindChild(const NewPPMNode_Ptr& Node, const Dasher::symbol& Symbol);
+        NewPPMNode* FindChild(const NewPPMNode* Node, const Dasher::symbol& Symbol);
 
         std::vector<NewPPMNode> knownNodes; //[0] is root node
         std::vector<NewPPMContext> knownContexts;
