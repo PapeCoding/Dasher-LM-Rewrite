@@ -69,12 +69,14 @@ NewPPMNode* NewPPM::AddSymbolToNode(NewPPMNode* Node, Dasher::symbol Symbol){
     //check if node already exists
     NewPPMNode* foundNode = FindChild(Node, Symbol);
     if(foundNode){
-       foundNode->count++;
+        foundNode->count++;
+        (*foundNode->parentCounter)++;
 
         if(!updateExclusions){
             // increase count moving up the vines to the root
             for (NewPPMNode* vine = foundNode->vine; vine; vine=vine->vine) {
                 vine->count++;
+                (*vine->parentCounter)++;
             }
         }
         return foundNode;
@@ -83,6 +85,7 @@ NewPPMNode* NewPPM::AddSymbolToNode(NewPPMNode* Node, Dasher::symbol Symbol){
     if(knownNodes.size() == knownNodes.capacity()) knownNodes.reserve(std::min(static_cast<size_t>(knownNodes.capacity()*3), maximumAmountOfNodes));
     NewPPMNode* newNode = &knownNodes.emplace_back(); // create new node
     newNode->sym = Symbol;
+    newNode->parentCounter = &Node->childSum;
 
     // make us the new head of the child list
     newNode->next_sibling = Node->first_child; // if it is empty this is just a nullptr assignment
@@ -132,16 +135,7 @@ void NewPPM::GetProbs(Context Context, std::vector<unsigned int>& Probs, int iNo
     const int beta = settings->GetLongParameter(Dasher::Parameter::LP_LM_BETA);
 
     for(NewPPMNode* curr = refContext.referencedNode; curr; curr=curr->vine){
-        int Total = 0;
-        
-        // sum all child counts
-        if(!curr->first_child) continue; // no children
-
-        for(NewPPMNode* ref = curr->first_child; ref; ref = ref->next_sibling){
-            Total += ref->count;
-        }
-
-        if(Total == 0) continue; // nothing to distribute between children, means 0 children as every child has at least count 1
+        const int Total = curr->childSum;
 
         const unsigned int size_of_slice = ToSpend;
 

@@ -7,6 +7,8 @@
 struct NewPPMNode {
     Dasher::symbol sym;
     unsigned count = 1;
+    unsigned childSum = 1;
+    unsigned* parentCounter = nullptr;
     NewPPMNode* vine = nullptr; // reference up the tree, where the referenced node is basically the same prefix but without the last character
     NewPPMNode* first_child = nullptr;
     NewPPMNode* next_sibling = nullptr;
