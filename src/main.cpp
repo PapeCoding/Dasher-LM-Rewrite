@@ -10,8 +10,8 @@
 
 #define numSymbols 58
 #define norm INT_MAX
-#define symbolsTrain 5000000
-#define symbolsTest  5000000
+#define symbolsTrain 500000
+#define symbolsTest  500000
 #define testSpeed false
 #define testSpeedClass NewPPM
 //#define testSpeedClass Dasher::CPPMLanguageModel
@@ -167,6 +167,6 @@ int main(int argc, char* argv[]) {
     Settings->Load();
     Settings->Save();
     
-    //return testSpeedFunction();
-    return testCorrectnessFunction();
+    return testSpeedFunction();
+    //return testCorrectnessFunction();
 }

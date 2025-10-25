@@ -2,6 +2,7 @@
 #include "LanguageModel.h"
 #include "SettingsStore.h"
 #include <unordered_map>
+#include <memory>
 
 typedef long long NewPPMNode_Ptr; //references into our vector of known nodes
 
@@ -9,7 +10,7 @@ struct NewPPMNode {
     Dasher::symbol sym;
     unsigned count = 1;
     NewPPMNode_Ptr vine = -1; // reference up the tree, where the referenced node is basically the same prefix but without the last character
-    std::vector<NewPPMNode_Ptr> children;
+    std::unique_ptr<std::vector<NewPPMNode_Ptr>> children;
 };
 
 struct NewPPMContext {
@@ -37,7 +38,8 @@ class NewPPM : public Dasher::CLanguageModel
         NewPPMNode_Ptr AddSymbolToNode(NewPPMNode_Ptr Node, Dasher::symbol Symbol);
 
         const NewPPMNode_Ptr FindChild(const NewPPMNode_Ptr& Node, const Dasher::symbol& Symbol){
-            for(const auto& ref : knownNodes[Node].children){
+            if(!knownNodes[Node].children) return -1;
+            for(const auto& ref : *knownNodes[Node].children){
                 if(knownNodes[ref].sym == Symbol) return ref;
             }
             return -1;

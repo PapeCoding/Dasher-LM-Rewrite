@@ -13,6 +13,7 @@ NewPPM::NewPPM(Dasher::CSettingsStore* pSettingsStore, int iNumSyms) :
     maximumAmountOfNodes--;
 
     knownNodes.push_back(NewPPMNode({-1})); // Root Node
+    knownNodes.reserve(1672385);
 }
 
 NewPPM::~NewPPM(){}
@@ -86,8 +87,9 @@ NewPPMNode_Ptr NewPPM::AddSymbolToNode(NewPPMNode_Ptr Node, Dasher::symbol Symbo
 
     auto& childArray = knownNodes[Node].children;
     // check for capacity before creating new new element
-    if(childArray.size() == childArray.capacity()) childArray.reserve(std::min(static_cast<int>(childArray.capacity()*1.5f+1), m_iNumSyms));
-    childArray.emplace_back(newNode);
+    if(childArray.get() == nullptr) childArray = std::make_unique<std::vector<NewPPMNode_Ptr>>();
+    if(childArray->size() == childArray->capacity()) childArray->reserve(std::min(static_cast<int>(childArray->capacity()*1.5f+1), m_iNumSyms));
+    childArray->emplace_back(newNode);
     knownNodes[newNode].vine = (Node == 0) ? 0 : AddSymbolToNode(knownNodes[Node].vine, Symbol);
 
     return newNode;
@@ -127,15 +129,17 @@ void NewPPM::GetProbs(Context Context, std::vector<unsigned int>& Probs, int iNo
         int Total = 0;
         
         // sum all child counts
-        for(auto const& ref: knownNodes[curr].children){
+        if(!knownNodes[curr].children) continue; // no children
+
+        for(auto const& ref: *knownNodes[curr].children){
             Total += knownNodes[ref].count;
         }
 
-        if(Total == 0) continue; // nothing to distribute between children
+        if(Total == 0) continue; // nothing to distribute between children, means 0 children as every child has at least count 1
 
         const unsigned int size_of_slice = ToSpend;
 
-        for(auto const& ref: knownNodes[curr].children){
+        for(auto const& ref: *knownNodes[curr].children){
             // optimized for decreased rounding error?
             const unsigned int p = static_cast<long long>(size_of_slice) * (100 * knownNodes[ref].count - beta) / (100 * Total + alpha);
             Probs[knownNodes[ref].sym] += p;
