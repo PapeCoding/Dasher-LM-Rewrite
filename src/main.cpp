@@ -15,7 +15,7 @@
 #define symbolsTest  500000
 #define testSpeed false
 #define testSpeedClass NewPPM
-#define testSpeedClass Dasher::CPPMLanguageModel
+//#define testSpeedClass Dasher::CPPMLanguageModel
 
 std::unique_ptr<Dasher::XmlSettingsStore> Settings;
 

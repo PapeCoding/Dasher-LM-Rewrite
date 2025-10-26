@@ -70,13 +70,11 @@ NewPPMNode* NewPPM::AddSymbolToNode(NewPPMNode* Node, Dasher::symbol Symbol){
     NewPPMNode* foundNode = FindChild(Node, Symbol);
     if(foundNode){
         foundNode->count++;
-        (*foundNode->parentCounter)++;
 
         if(!updateExclusions){
             // increase count moving up the vines to the root
             for (NewPPMNode* vine = foundNode->vine; vine; vine=vine->vine) {
                 vine->count++;
-                (*vine->parentCounter)++;
             }
         }
         return foundNode;
@@ -85,11 +83,8 @@ NewPPMNode* NewPPM::AddSymbolToNode(NewPPMNode* Node, Dasher::symbol Symbol){
     if(knownNodes.size() == knownNodes.capacity()) knownNodes.reserve(std::min(static_cast<size_t>(knownNodes.capacity()*3), maximumAmountOfNodes));
     NewPPMNode* newNode = &knownNodes.emplace_back(); // create new node
     newNode->sym = Symbol;
-    newNode->parentCounter = &Node->childSum;
-
-    // make us the new head of the child list
-    newNode->next_sibling = Node->first_child; // if it is empty this is just a nullptr assignment
-    Node->first_child = newNode;
+    if(Node->children.capacity() == Node->children.size()) Node->children.reserve(Node->children.size() + 1);
+    Node->children.emplace_back(newNode);
 
     newNode->vine = (Node == knownNodes.data()) ? Node : AddSymbolToNode(Node->vine, Symbol);
 
@@ -97,8 +92,7 @@ NewPPMNode* NewPPM::AddSymbolToNode(NewPPMNode* Node, Dasher::symbol Symbol){
 }
 
 NewPPMNode* NewPPM::FindChild(const NewPPMNode* Node, const Dasher::symbol& Symbol) {
-    if (!Node->first_child) return nullptr;
-    for (NewPPMNode* ref = Node->first_child; ref; ref = ref->next_sibling) {
+    for (NewPPMNode* ref : Node->children) {
         if(ref->sym == Symbol) return ref;
     }
     return nullptr;
@@ -135,11 +129,20 @@ void NewPPM::GetProbs(Context Context, std::vector<unsigned int>& Probs, int iNo
     const int beta = settings->GetLongParameter(Dasher::Parameter::LP_LM_BETA);
 
     for(NewPPMNode* curr = refContext.referencedNode; curr; curr=curr->vine){
-        const int Total = curr->childSum;
+        int Total = 0;
+        
+        // sum all child counts
+        if(curr->children.size() == 0) continue; // no children
+
+        for(NewPPMNode* ref : curr->children){
+            Total += ref->count;
+        }
+
+        if(Total == 0) continue; // nothing to distribute between children, means 0 children as every child has at least count 1
 
         const unsigned int size_of_slice = ToSpend;
 
-        for(NewPPMNode* ref = curr->first_child; ref; ref = ref->next_sibling){
+        for(NewPPMNode* ref : curr->children){
             // optimized for decreased rounding error?
             const unsigned int p = static_cast<long long>(size_of_slice) * (100 * ref->count - beta) / (100 * Total + alpha);
             Probs[ref->sym] += p;
