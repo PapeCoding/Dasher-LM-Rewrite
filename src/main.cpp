@@ -198,11 +198,15 @@ int main(int argc, char* argv[]) {
     Settings->Load();
     Settings->Save();
     
-    std::cout << "======================\nNewPPM" << std::endl;
-    if(testSpeedFunction<NewPPM>()) return 1;
-    std::cout << "======================\nOldPPM" << std::endl;
-    if(testSpeedFunction<Dasher::CPPMLanguageModel>()) return 1;
-    std::cout << "======================" << std::endl;
+    for(int i = 0; i < 5; i++){
+        std::cout << "======================\nNewPPM" << std::endl;
+        if(testSpeedFunction<NewPPM>()) return 1;
+        //std::cout << "======================\nOldPPM" << std::endl;
+        //if(testSpeedFunction<Dasher::CPPMLanguageModel>()) return 1;
+        std::cout << "======================" << std::endl;
+    }
+
+    //if(testCorrectnessFunction()) return 1;
 
     return 0;
 }

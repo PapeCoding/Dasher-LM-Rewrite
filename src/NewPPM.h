@@ -10,7 +10,12 @@ struct NewPPMNode {
     Dasher::symbol sym;
     unsigned count = 1;
     NewPPMNode* vine = nullptr; // reference up the tree, where the referenced node is basically the same prefix but without the last character
-    LazyReferenceArray<NewPPMNode> children;
+    
+    unsigned childCount = 0;
+    union {
+        NewPPMNode** array;
+        NewPPMNode* firstElement = nullptr;
+    };
 };
 
 struct NewPPMContext {

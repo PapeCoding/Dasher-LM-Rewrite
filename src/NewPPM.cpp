@@ -76,15 +76,41 @@ NewPPMNode* NewPPM::AddSymbolToNode(NewPPMNode* Node, Dasher::symbol Symbol){
     }
     NewPPMNode* newNode = knownNodes.Alloc(); // create new node
     newNode->sym = Symbol;
-    Node->children.Add(newNode);
+    
+    if(Node->childCount == 0){
+        // 0 elements, so directly assign into the pointer
+        Node->firstElement = newNode;
+    }else if(Node->childCount == 1){
+        // 1 element, so create array and copy pointer from before
+        NewPPMNode* firstChild = Node->firstElement;
+        Node->array = new NewPPMNode*[2];
+        Node->array[0] = firstChild;
+        Node->array[1] = newNode;
+    }else if(Node->childCount > 1){
+        //extend array by one and copy over
+        NewPPMNode** oldElements = Node->array;
+        Node->array = new NewPPMNode*[Node->childCount + 1];
+        memcpy(&Node->array[0], &oldElements[0], Node->childCount * sizeof(NewPPMNode*));
+        delete[] oldElements;
+
+        Node->array[Node->childCount] = newNode;
+    }
+    Node->childCount++;
+
     newNode->vine = (Node == rootNode) ? Node : AddSymbolToNode(Node->vine, Symbol);
 
     return newNode;
 }
 
 NewPPMNode* NewPPM::FindChild(const NewPPMNode* Node, const Dasher::symbol& Symbol) {
-    for(NewPPMNode* n : Node->children) {
-        if(n->sym == Symbol) return n;
+    if(Node->childCount == 0) return nullptr;
+    if(Node->childCount == 1){
+        if(Node->firstElement->sym == Symbol) return Node->firstElement;
+        return nullptr;
+    }
+    
+    for(unsigned i = 0; i < Node->childCount; i++) {
+        if(Node->array[i]->sym == Symbol) return Node->array[i];
     }
     return nullptr;
 }
@@ -120,19 +146,27 @@ void NewPPM::GetProbs(Context Context, std::vector<unsigned int>& Probs, int iNo
     const int beta = settings->GetLongParameter(Dasher::Parameter::LP_LM_BETA);
 
     for(NewPPMNode* curr = refContext.referencedNode; curr; curr=curr->vine){
-        int Total = 0;
+        if(curr->childCount == 0) continue;
 
-        for(NewPPMNode* child : curr->children){
-            Total += child->count;
-        }
-
-        if(Total == 0) continue; // nothing to distribute between children, means 0 children as every child has at least count 1
-
-        const unsigned int size_of_slice = ToSpend;
-        for(NewPPMNode* child : curr->children){
-            const unsigned int p = static_cast<long long>(size_of_slice) * (100 * child->count - beta) / (100 * Total + alpha);
-            Probs[child->sym] += p;
+        if(curr->childCount == 1){
+            const unsigned int p = static_cast<long long>(ToSpend) * (100 * curr->firstElement->count - beta) / (100 * curr->firstElement->count + alpha);
+            Probs[curr->firstElement->sym] += p;
             ToSpend -= p;
+        }else{
+            int Total = 0;
+
+            for(unsigned i = 0; i < curr->childCount; i++){
+                Total += curr->array[i]->count;
+            }
+
+            if(Total == 0) continue; // nothing to distribute between children, means 0 children as every child has at least count 1
+
+            const unsigned int size_of_slice = ToSpend;
+            for(unsigned i = 0; i < curr->childCount; i++){
+                const unsigned int p = static_cast<long long>(size_of_slice) * (100 * curr->array[i]->count - beta) / (100 * Total + alpha);
+                Probs[curr->array[i]->sym] += p;
+                ToSpend -= p;
+            }
         }
     }
     
