@@ -11,11 +11,10 @@
 
 #define numSymbols 58
 #define norm INT_MAX
+
 #define symbolsTrain 500000
 #define symbolsTest  500000
-#define testSpeed false
-#define testSpeedClass NewPPM
-//#define testSpeedClass Dasher::CPPMLanguageModel
+#define symbolsProbs  5000000
 
 std::unique_ptr<Dasher::XmlSettingsStore> Settings;
 
@@ -121,8 +120,9 @@ int testCorrectnessFunction(){
     return 0;
 }
 
+template<typename T>
 int testSpeedFunction(){
-    std::unique_ptr<testSpeedClass> lm = std::make_unique<testSpeedClass>(Settings.get(), numSymbols);
+    std::unique_ptr<T> lm = std::make_unique<T>(Settings.get(), numSymbols);
 
     // open train file
     std::ifstream trainFile("../trainText.txt");
@@ -148,11 +148,20 @@ int testSpeedFunction(){
         i++;
     }
     lm->ReleaseContext(context);
+
+    std::cout << "Train: " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count() << "ms" << std::endl;
+    
+    delete[] heapBuffer;
     
     // open test file 
     std::ifstream testFile("../testText.txt");
     if (!testFile.is_open()) return 1;
     
+    // read buffer into memory before timing
+    heapBuffer = new char[symbolsTest];
+    testFile.read(heapBuffer, symbolsTest);
+
+    start = std::chrono::high_resolution_clock::now();
     // test language model
     i = 0;
     context = lm->CreateEmptyContext();
@@ -163,9 +172,22 @@ int testSpeedFunction(){
     }
     lm->ReleaseContext(context);
 
-    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count() << std::endl;
+    std::cout << "Test: " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count() << "ms" << std::endl;
 
     delete[] heapBuffer;
+
+    start = std::chrono::high_resolution_clock::now();
+    // test language model
+    i = 0;
+    context = lm->CreateEmptyContext();
+    while(i < symbolsProbs){
+        lm->GetProbs(context, probs, norm, 0);
+        i++;
+    }
+    lm->ReleaseContext(context);
+
+    std::cout << "Probs: " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count() << "ms" << std::endl;
+
     return 0;
 }
 
@@ -176,6 +198,11 @@ int main(int argc, char* argv[]) {
     Settings->Load();
     Settings->Save();
     
-    return testSpeedFunction();
-    //return testCorrectnessFunction();
+    std::cout << "======================\nNewPPM" << std::endl;
+    if(testSpeedFunction<NewPPM>()) return 1;
+    std::cout << "======================\nOldPPM" << std::endl;
+    if(testSpeedFunction<Dasher::CPPMLanguageModel>()) return 1;
+    std::cout << "======================" << std::endl;
+
+    return 0;
 }

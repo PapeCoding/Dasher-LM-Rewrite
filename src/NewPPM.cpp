@@ -1,19 +1,14 @@
 #include "NewPPM.h"
 #include "Parameters.h"
-#include <cmath>
 
 NewPPM::NewPPM(Dasher::CSettingsStore* pSettingsStore, int iNumSyms) : 
     CLanguageModel(iNumSyms),
     updateExclusions(pSettingsStore->GetLongParameter(Dasher::Parameter::LP_LM_UPDATE_EXCLUSION) != 0),
-    settings(pSettingsStore)
+    settings(pSettingsStore),
+    knownNodes(1000)
 {
-    // compute maximumAmountOfNodes = m_iNumSyms^(maxOrder+1) - 1 manually, as there is no `int pow(int, int)` currently
-    maximumAmountOfNodes = m_iNumSyms;
-    for(unsigned int i = 1; i <= maxOrder; i++)  maximumAmountOfNodes *= static_cast<unsigned int>(m_iNumSyms);
-    maximumAmountOfNodes--;
-
-    knownNodes.push_back(NewPPMNode({-1})); // Root Node
-    knownNodes.reserve(1672383);
+    rootNode = knownNodes.Alloc();
+    rootNode->sym = -1;
 }
 
 NewPPM::~NewPPM(){}
@@ -23,7 +18,7 @@ bool NewPPM::isValidContext(Dasher::CLanguageModel::Context context) const {
 }
 
 Dasher::CLanguageModel::Context NewPPM::CreateEmptyContext(){
-    knownContexts.push_back(NewPPMContext({0, &knownNodes[0]}));
+    knownContexts.push_back(NewPPMContext({0, rootNode}));
     return knownContexts.size() - 1;
 }
 
@@ -44,7 +39,7 @@ void NewPPM::EnterSymbol(Context Context, int Symbol){
     if(!isValidContext(Context)) return;
 
     auto& refContext = knownContexts[Context];
-    while(refContext.referencedNode >= 0){
+    while(refContext.referencedNode){
         // only extend the context if it is not too long already
         if(refContext.order < maxOrder){
             NewPPMNode* child = FindChild(refContext.referencedNode, Symbol);
@@ -59,7 +54,7 @@ void NewPPM::EnterSymbol(Context Context, int Symbol){
         refContext.referencedNode = refContext.referencedNode->vine;
     }
 
-    if(refContext.referencedNode < 0) {
+    if(!refContext.referencedNode) {
         refContext.referencedNode = 0;
         refContext.order = 0;
     }
@@ -79,21 +74,17 @@ NewPPMNode* NewPPM::AddSymbolToNode(NewPPMNode* Node, Dasher::symbol Symbol){
         }
         return foundNode;
     }
-    // check for capacity before creating new new element
-    if(knownNodes.size() == knownNodes.capacity()) knownNodes.reserve(std::min(static_cast<size_t>(knownNodes.capacity()*3), maximumAmountOfNodes));
-    NewPPMNode* newNode = &knownNodes.emplace_back(); // create new node
+    NewPPMNode* newNode = knownNodes.Alloc(); // create new node
     newNode->sym = Symbol;
-    if(Node->children.capacity() == Node->children.size()) Node->children.reserve(Node->children.size() + 1);
-    Node->children.emplace_back(newNode);
-
-    newNode->vine = (Node == knownNodes.data()) ? Node : AddSymbolToNode(Node->vine, Symbol);
+    Node->children.Add(newNode);
+    newNode->vine = (Node == rootNode) ? Node : AddSymbolToNode(Node->vine, Symbol);
 
     return newNode;
 }
 
 NewPPMNode* NewPPM::FindChild(const NewPPMNode* Node, const Dasher::symbol& Symbol) {
-    for (NewPPMNode* ref : Node->children) {
-        if(ref->sym == Symbol) return ref;
+    for(NewPPMNode* n : Node->children) {
+        if(n->sym == Symbol) return n;
     }
     return nullptr;
 }
@@ -130,22 +121,17 @@ void NewPPM::GetProbs(Context Context, std::vector<unsigned int>& Probs, int iNo
 
     for(NewPPMNode* curr = refContext.referencedNode; curr; curr=curr->vine){
         int Total = 0;
-        
-        // sum all child counts
-        if(curr->children.size() == 0) continue; // no children
 
-        for(NewPPMNode* ref : curr->children){
-            Total += ref->count;
+        for(NewPPMNode* child : curr->children){
+            Total += child->count;
         }
 
         if(Total == 0) continue; // nothing to distribute between children, means 0 children as every child has at least count 1
 
         const unsigned int size_of_slice = ToSpend;
-
-        for(NewPPMNode* ref : curr->children){
-            // optimized for decreased rounding error?
-            const unsigned int p = static_cast<long long>(size_of_slice) * (100 * ref->count - beta) / (100 * Total + alpha);
-            Probs[ref->sym] += p;
+        for(NewPPMNode* child : curr->children){
+            const unsigned int p = static_cast<long long>(size_of_slice) * (100 * child->count - beta) / (100 * Total + alpha);
+            Probs[child->sym] += p;
             ToSpend -= p;
         }
     }

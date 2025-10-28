@@ -1,14 +1,16 @@
+#pragma once
+
 #include "DasherTypes.h"
 #include "LanguageModel.h"
+#include "LazyArray.h"
 #include "SettingsStore.h"
-#include <unordered_map>
-#include <memory>
+#include "SimplePooledAlloc.h"
 
 struct NewPPMNode {
     Dasher::symbol sym;
     unsigned count = 1;
     NewPPMNode* vine = nullptr; // reference up the tree, where the referenced node is basically the same prefix but without the last character
-    std::vector<NewPPMNode*> children;
+    LazyReferenceArray<NewPPMNode> children;
 };
 
 struct NewPPMContext {
@@ -37,11 +39,11 @@ class NewPPM : public Dasher::CLanguageModel
 
         NewPPMNode* FindChild(const NewPPMNode* Node, const Dasher::symbol& Symbol);
 
-        std::vector<NewPPMNode> knownNodes; //[0] is root node
+        CSimplePooledAlloc<NewPPMNode> knownNodes;
+        NewPPMNode* rootNode;
         std::vector<NewPPMContext> knownContexts;
 
         bool updateExclusions = false;
         unsigned int maxOrder = 5;
-        size_t maximumAmountOfNodes = 0;
         Dasher::CSettingsStore* settings;
 };
