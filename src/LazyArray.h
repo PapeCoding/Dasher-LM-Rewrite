@@ -4,7 +4,7 @@
 // First child is stored directly, once a second child gets added we switch to an array on the heap and copy everything over
 template<typename Element_t, typename Counter = unsigned>
 class LazyReferenceArray{
-protected:
+public:
     Counter elementCount = 0;
 
     union {
@@ -45,12 +45,7 @@ public:
         iterator operator++() {crr++; return *this;}
         bool operator!=(const iterator & other) const { return crr != other.crr;  }
         Element_t* operator*() const {
-            if(array->elementCount == 0) return nullptr;
-            if(array->elementCount == 1){
-                if(crr > 0) return nullptr;
-                return array->firstElement;
-            }
-            return array->array[crr];
+            return (array->elementCount == 1) ? array->firstElement : array->array[crr];
         }
     private:
         Counter crr;
